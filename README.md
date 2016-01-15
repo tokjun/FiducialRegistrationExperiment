@@ -22,8 +22,7 @@ For each image, Slicer will create 3 transforms:
 The output file will contains all information about the experimental configuration (bloc used, fiducial rotation angle, position, ...), as well as the registration results (fiducial detected, outliers, FRE, ...)
 
 ##Issues:
-Some registration seems to have a big FRE, not sure why.
-
-Also, the GoldStandard calculation has to be checked (I'm not sure I had time to properly finish to calculate it), as well as Relative_Registration_Matrix_Serie###
+* Some registration seems to have a big FRE, need some investigation.
+* The GoldStandard calculation has to be checked (I'm not sure I had time to properly finish to calculate it), as well as Relative_Registration_Matrix_Serie###
 
 
