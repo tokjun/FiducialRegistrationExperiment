@@ -9,6 +9,7 @@ Data could only be processed batch by batch (to avoid series number conflict).
 
 ##Steps:
 * Load all batch images from DICOM into Slicer
+* Load fiducial pattern (RegistrationExperimentFiducialPattern.fcsv)
 * Open Python interpreter and load batchProcessRegistrationExperiment.py
 * Execute function processExperimentData, with, the batch spreadsheet (containing series number) as first argument, and output file as second
 * Wait until end of execution (could take a while)
