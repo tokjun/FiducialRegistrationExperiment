@@ -22,6 +22,7 @@ The output file will contains all information about the experimental configurati
 
 ##Issues:
 Some registration seems to have a big FRE, not sure why.
+
 Also, the GoldStandard calculation has to be checked (I'm not sure I had time to properly finish to calculate it).
 
 
