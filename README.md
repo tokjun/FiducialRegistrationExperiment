@@ -3,7 +3,7 @@
 ##Require:
 * Slicer4
 * MRRobotRegistration module (from SNRLab)
-* Data (Mad Drive)
+* Data (Mad Drive: Projects/Ca***/LiverMRIRobot/RegistrationValidation)
 
 Data could only be processed batch by batch (to avoid series number conflict).
 
