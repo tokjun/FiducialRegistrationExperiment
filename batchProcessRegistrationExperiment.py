@@ -30,20 +30,20 @@ def runRegistration(scan, volId):
 
    return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, procTime, wallTime, registrationMatrix.GetName(), registrationMatrix.GetID()
 
-def calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot):
-   transform = vtk.vtkTransform()
+def calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot, transform):
 
-   transform.RotateY(int(fid_rot))
-   transform.RotateZ(-int(block))
-   transform.RotateY(int(block_rot))
+   transform.RotateY(-float(fid_rot)*vtk.vtkMath.Pi()/180.0)
+   transform.RotateX(float(block)*vtk.vtkMath.Pi()/180.0)
+   transform.RotateY(float(block_rot)*vtk.vtkMath.Pi()/180.0)
+   
    transform.Translate(-int(x)*50,int(z)*10,-int(y)*50)
    
-   ### Debug ###
-   n = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-   n.SetName("Transform_GoldStandard_Serie"+str(scan))
-   slicer.mrmlScene.AddNode(n)
-   n.SetAndObserveMatrixTransformToParent(transform.GetMatrix())
-   #############
+   #### Debug ###
+   #n = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
+   #n.SetName("Transform_GoldStandard_Serie"+str(scan))
+   #slicer.mrmlScene.AddNode(n)
+   #n.SetAndObserveMatrixTransformToParent(transform.GetMatrix())
+   ##############
 
    return 0
 
@@ -100,9 +100,6 @@ def batchRegistration(imageInfoCSV, outputFile):
                scanstr = str(int(scan))
                if scanstr in node_dict:
                                                   
-                  # Calculate gold standard (could be done only for each line)
-                  calculateGoldStandard(str(int(scan)),x,y,z,block,block_rot,fid_rot)
-
                   volId = node_dict[str(int(scan))]
                   [fiducialDetected, outliersDetected, registrationError, wallTime, procTime, registrationMatrixName, registrationMatrixId] = runRegistration(str(int(scan)), volId)
 
@@ -116,6 +113,46 @@ def batchRegistration(imageInfoCSV, outputFile):
 
    
 
+def batchComputeError(registrationResultCSV, errorCSV):
+   
+   with open(registrationResultCSV,'rb') as inputFile:
+      
+      # Parse csv file
+      csvreader = csv.reader(inputFile.readlines()[6:], delimiter=',')
+
+      regMat = vtk.vtkMatrix4x4()
+      transform = vtk.vtkTransform()
+      baseMat = vtk.vtkMatrix4x4()
+      
+      for row in csvreader:
+         #[scan, x, y, z, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime] = row[0:12]
+
+         scan = int(row[0])
+         x = int(row[1])
+         y = int(row[2])
+         z = int(row[3])
+         block = int(row[4])
+         block_rot = int(row[5])
+         fid_rot = int(row[6])
+         fiducialDetected = int(row[7])
+         outliersDetected = int(row[8])
+         registrationError = float(row[9])
+         wallTime = float(row[10])
+         procTime = float(row[11])
+
+         for i in range(0,16):
+            regMat.SetElement(i/4, i%4, float(row[i+12]))
+         
+         # Calculate gold standard (could be done only for each line)
+         calculateGoldStandard(str(int(scan)),x,y,z,block,block_rot,fid_rot, transform)
+         transform.GetMatrix(baseMat)
+
+         print '======================'
+         print regMat
+         print baseMat
+         
+
+                  
 def processExperimentData(imageInfoCSV, outputFile):
 
    # Open spreadsheets
@@ -142,7 +179,12 @@ def processExperimentData(imageInfoCSV, outputFile):
          
          # Parse csv file
          csvreader = csv.reader(ss.readlines()[6:], delimiter=',')
+
+         baseMat = vtk.vtkMatrix4x4()
+         transform = vtk.vtkTransform()
+         
          for row in csvreader:
+            
 
             # Skip line if empty
             if all(el is '' for el in row):
@@ -168,7 +210,8 @@ def processExperimentData(imageInfoCSV, outputFile):
                if str(int(scan)) in node_dict:
                                                   
                   # Calculate gold standard (could be done only for each line)
-                  calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot)
+                  calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot, transform)
+                  transform.GetMatrix(baseMat)
 
                   volId = node_dict[str(int(scan))]
                   [fiducialDetected, outliersDetected, registrationError, wallTime, procTime, registrationMatrixName, registrationMatrixId] = runRegistration(scan, volId)
