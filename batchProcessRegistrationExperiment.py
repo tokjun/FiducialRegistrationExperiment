@@ -31,20 +31,25 @@ def runRegistration(scan, volId):
    return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, procTime, wallTime, registrationMatrix.GetName(), registrationMatrix.GetID()
 
 
-def calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, transform):
+def calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, matrix):
 
-   #print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
-   #print '(block, block_rot, fid_rot) = (%f, %f, %f)' % (block, block_rot, fid_rot)
-
+   transform = vtk.vtkTransform()
    transform.Identity()
    transform.PostMultiply()
 
    transform.RotateY(float(fid_rot))
-   transform.RotateX(-float(block))
+   transform.RotateZ(-float(block))
    transform.RotateY(float(block_rot))
-
    transform.Translate(-int(x)*50,int(z)*10,-int(y)*50)
-   
+
+   transform.GetMatrix(matrix)
+
+   #matrix.SetElement(0, 3, -int(x)*50)
+   #matrix.SetElement(1, 3, int(z)*10)
+   #matrix.SetElement(2, 3, -int(y)*50)
+
+   print matrix
+
    #### Debug ###
    #n = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
    #n.SetName("Transform_TheoreticalTransform_Serie"+str(scan))
@@ -136,7 +141,7 @@ def batchComputeError(registrationResultCSV, errorCSV):
    
          originArray = [] # Array of scan # where the marker is placed at the origin
          nScans = 0
-   
+
          for row in csvreader:
    
             scan = int(row[0])
@@ -169,15 +174,12 @@ def batchComputeError(registrationResultCSV, errorCSV):
             regMatrixArray.append(regMatrix)
    
             # Calculate theoretical transform
-            theoTrans = vtk.vtkTransform()
-            theoTrans.Identity()
-            calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, theoTrans)
             theoMatrix = vtk.vtkMatrix4x4()
-            theoTrans.GetMatrix(theoMatrix)
+            calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, theoMatrix)
             theoMatrixArray.append(theoMatrix)
    
             nScans = nScans + 1
-   
+
          if len(originArray) == 0:  ## for 11-19-2015 (no scan at the origin) 
             for n in range(0, nScans):
                [scan, x, y, z, block, block_rot, fid_rot] = paramArray[n]
@@ -187,7 +189,9 @@ def batchComputeError(registrationResultCSV, errorCSV):
    
          # Was the marker scanned consecutively at the origin?
          fConsecutiveOrigin = 0
-         if (originArray[1] - originArray[0]) == 1:
+         scan0 = paramArray[originArray[0]][0]
+         scan1 = paramArray[originArray[1]][0]
+         if (scan0 - scan1) == 1:
             fConsecutiveOrigin = 1
             
          print 'fConsecutiveOrigin = %d' % fConsecutiveOrigin
@@ -210,41 +214,58 @@ def batchComputeError(registrationResultCSV, errorCSV):
             else:
                for m in originArray:
                   [scan_o, x_o, y_o, z_o, block_o, block_rot_o, fid_rot_o] = paramArray[m]
-                  if scan_o < scan and scan_o > recentOriginScan:
+                  if scan_o <= scan and scan_o > recentOriginScan:
                      recentOriginScan = scan_o
                      recentOriginIndex = m
    
             if recentOriginIndex < 0:
                print "ERROR: No recent scan at origin."
                return
+
+            print 'recentOriginIndex = %d' % recentOriginIndex
+            print 'recentOriginScan  = %d' % recentOriginScan
             
             ## Obtain theoretical transform from the origin to the current
             theoOriginMatrix = theoMatrixArray[recentOriginIndex]
             theoRefMatrix = theoMatrixArray[n]
 
-            print "theoOriginMatrix"
-            print theoOriginMatrix
-
-            invTheoOriginMatrix = vtk.vtkMatrix4x4()
-            vtk.vtkMatrix4x4.Invert(theoOriginMatrix, invTheoOriginMatrix)
-   
-            theoMatrix = vtk.vtkMatrix4x4()
-            vtk.vtkMatrix4x4.Multiply4x4(theoRefMatrix, invTheoOriginMatrix, theoMatrix)
-   
-            ## Calculate actual transform from the origin to the current
+            ## Obtain actual transform from the origin to the current
             originMatrix = regMatrixArray[recentOriginIndex]
             refMatrix = regMatrixArray[n]
 
-            print "originMatrix"
-            print originMatrix
-
+            ## Compute theoretical transfrom from the origin to the reference
+            ## T = T_ref * T_orig^-1
+            invTheoOriginMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Invert(theoOriginMatrix, invTheoOriginMatrix)
+            theoMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Multiply4x4(theoRefMatrix, invTheoOriginMatrix, theoMatrix)
+            
+            ## Compute actual (detected) transfrom from the origin to the reference
+            ## <T> = <T_ref> * <T_orig>^-1
             invOriginMatrix = vtk.vtkMatrix4x4()
             vtk.vtkMatrix4x4.Invert(originMatrix, invOriginMatrix)
-   
             matrix = vtk.vtkMatrix4x4()
             vtk.vtkMatrix4x4.Multiply4x4(refMatrix, invOriginMatrix, matrix)
-   
-            ## Calculate the error between the actual and the theoretical transforms
+
+            print "theoOriginMatrix"
+            print theoOriginMatrix
+            print "theoOriginMatrix^-1"
+            print invTheoOriginMatrix
+            print "theoRefMatrix"
+            print theoRefMatrix
+            
+            print "originMatrix"
+            print originMatrix
+            print "refMatrix"
+            print refMatrix
+            
+            print "theoMatrix"
+            print theoMatrix
+            print "matrix"
+            print matrix
+
+            ## Compute the error between the actual and the theoretical transforms
+            ## T_err = <T> * T^-1
             invTheoMatrix = vtk.vtkMatrix4x4()
             vtk.vtkMatrix4x4.Invert(theoMatrix, invTheoMatrix)
    
@@ -285,8 +306,8 @@ def processExperimentData(imageInfoCSV, outputFile):
          # Parse csv file
          csvreader = csv.reader(ss.readlines()[6:], delimiter=',')
 
-         baseMat = vtk.vtkMatrix4x4()
-         transform = vtk.vtkTransform()
+         #baseMat = vtk.vtkMatrix4x4()
+         #transform = vtk.vtkTransform()
          
          for row in csvreader:
             
@@ -315,9 +336,7 @@ def processExperimentData(imageInfoCSV, outputFile):
                if str(int(scan)) in node_dict:
                                                   
                   # Calculate gold standard (could be done only for each line)
-                  transform.Identity()
-                  calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, transform)
-                  transform.GetMatrix(baseMat)
+                  #calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, baseMat)
 
                   volId = node_dict[str(int(scan))]
                   [fiducialDetected, outliersDetected, registrationError, wallTime, procTime, registrationMatrixName, registrationMatrixId] = runRegistration(scan, volId)
