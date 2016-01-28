@@ -30,17 +30,24 @@ def runRegistration(scan, volId):
 
    return reg.fiducialDetectedBox.text, reg.outliersDetectedBox.text, reg.registrationError.text, procTime, wallTime, registrationMatrix.GetName(), registrationMatrix.GetID()
 
-def calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot, transform):
 
-   transform.RotateY(-float(fid_rot)*vtk.vtkMath.Pi()/180.0)
-   transform.RotateX(float(block)*vtk.vtkMath.Pi()/180.0)
-   transform.RotateY(float(block_rot)*vtk.vtkMath.Pi()/180.0)
-   
+def calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, transform):
+
+   #print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
+   #print '(block, block_rot, fid_rot) = (%f, %f, %f)' % (block, block_rot, fid_rot)
+
+   transform.Identity()
+   transform.PostMultiply()
+
+   transform.RotateY(float(fid_rot))
+   transform.RotateX(-float(block))
+   transform.RotateY(float(block_rot))
+
    transform.Translate(-int(x)*50,int(z)*10,-int(y)*50)
    
    #### Debug ###
    #n = slicer.mrmlScene.CreateNodeByClass("vtkMRMLLinearTransformNode")
-   #n.SetName("Transform_GoldStandard_Serie"+str(scan))
+   #n.SetName("Transform_TheoreticalTransform_Serie"+str(scan))
    #slicer.mrmlScene.AddNode(n)
    #n.SetAndObserveMatrixTransformToParent(transform.GetMatrix())
    ##############
@@ -116,43 +123,141 @@ def batchRegistration(imageInfoCSV, outputFile):
 def batchComputeError(registrationResultCSV, errorCSV):
    
    with open(registrationResultCSV,'rb') as inputFile:
-      
-      # Parse csv file
-      csvreader = csv.reader(inputFile.readlines()[6:], delimiter=',')
+      with open(errorCSV,'wb') as outputFile:
 
-      regMat = vtk.vtkMatrix4x4()
-      transform = vtk.vtkTransform()
-      baseMat = vtk.vtkMatrix4x4()
-      
-      for row in csvreader:
-         #[scan, x, y, z, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime] = row[0:12]
+         csvwriter = csv.writer(outputFile)
 
-         scan = int(row[0])
-         x = int(row[1])
-         y = int(row[2])
-         z = int(row[3])
-         block = int(row[4])
-         block_rot = int(row[5])
-         fid_rot = int(row[6])
-         fiducialDetected = int(row[7])
-         outliersDetected = int(row[8])
-         registrationError = float(row[9])
-         wallTime = float(row[10])
-         procTime = float(row[11])
+         # Parse csv file
+         csvreader = csv.reader(inputFile.readlines()[1:], delimiter=',')
+   
+         paramArray = []
+         regMatrixArray = []
+         theoMatrixArray = []
+   
+         originArray = [] # Array of scan # where the marker is placed at the origin
+         nScans = 0
+   
+         for row in csvreader:
+   
+            scan = int(row[0])
+            x = int(row[1])
+            y = int(row[2])
+            z = int(row[3])
+            block = int(row[4])
+            block_rot = int(row[5])
+            fid_rot = int(row[6])
+            fiducialDetected = int(row[7])
+            outliersDetected = int(row[8])
+            registrationError = float(row[9])
+            wallTime = float(row[10])
+            procTime = float(row[11])
+   
+            regMatrix = vtk.vtkMatrix4x4()
+            for i in range(0,16):
+               regMatrix.SetElement(i/4, i%4, float(row[i+12]))
+            
+            ## Calculate gold standard (could be done only for each line)
+            #transform.Identity()
+            #print '======================'
+            #calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, transform)
+            #transform.GetMatrix(baseMat)
+   
+            if x == 0 and y == 0 and z == 1 and block == 0 and block_rot == 0 and fid_rot == 0:
+               originArray.append(nScans)
+   
+            paramArray.append([scan, x, y, z, block, block_rot, fid_rot])
+            regMatrixArray.append(regMatrix)
+   
+            # Calculate theoretical transform
+            theoTrans = vtk.vtkTransform()
+            theoTrans.Identity()
+            calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, theoTrans)
+            theoMatrix = vtk.vtkMatrix4x4()
+            theoTrans.GetMatrix(theoMatrix)
+            theoMatrixArray.append(theoMatrix)
+   
+            nScans = nScans + 1
+   
+         if len(originArray) == 0:  ## for 11-19-2015 (no scan at the origin) 
+            for n in range(0, nScans):
+               [scan, x, y, z, block, block_rot, fid_rot] = paramArray[n]
+               if x == 0 and y == 0 and z == 1 and block == 30 and block_rot == 0 and fid_rot == 0:
+                  originArray.append(n)
+   
+   
+         # Was the marker scanned consecutively at the origin?
+         fConsecutiveOrigin = 0
+         if (originArray[1] - originArray[0]) == 1:
+            fConsecutiveOrigin = 1
+            
+         print 'fConsecutiveOrigin = %d' % fConsecutiveOrigin
+   
+         # Main loop
+         recentOriginArrayIndex = 0
+         for n in range(0, nScans):
+            
+            [scan, x, y, z, block, block_rot, fid_rot] = paramArray[n]
+   
+            ## Find the most recent scan at the origin
+            # If the marker was scannend at the origin consecutively,
+            # the origin scan was assigned alternatively
+            recentOriginIndex = -1
+            recentOriginScan = -1
+   
+            if fConsecutiveOrigin:
+               recentOriginIndex = originArray[recentOriginArrayIndex]
+               recentOriginArrayIndex = (recentOriginArrayIndex + 1)%len(originArray)
+            else:
+               for m in originArray:
+                  [scan_o, x_o, y_o, z_o, block_o, block_rot_o, fid_rot_o] = paramArray[m]
+                  if scan_o < scan and scan_o > recentOriginScan:
+                     recentOriginScan = scan_o
+                     recentOriginIndex = m
+   
+            if recentOriginIndex < 0:
+               print "ERROR: No recent scan at origin."
+               return
+            
+            ## Obtain theoretical transform from the origin to the current
+            theoOriginMatrix = theoMatrixArray[recentOriginIndex]
+            theoRefMatrix = theoMatrixArray[n]
 
-         for i in range(0,16):
-            regMat.SetElement(i/4, i%4, float(row[i+12]))
-         
-         # Calculate gold standard (could be done only for each line)
-         calculateGoldStandard(str(int(scan)),x,y,z,block,block_rot,fid_rot, transform)
-         transform.GetMatrix(baseMat)
+            print "theoOriginMatrix"
+            print theoOriginMatrix
 
-         print '======================'
-         print regMat
-         print baseMat
-         
+            invTheoOriginMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Invert(theoOriginMatrix, invTheoOriginMatrix)
+   
+            theoMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Multiply4x4(theoRefMatrix, invTheoOriginMatrix, theoMatrix)
+   
+            ## Calculate actual transform from the origin to the current
+            originMatrix = regMatrixArray[recentOriginIndex]
+            refMatrix = regMatrixArray[n]
 
-                  
+            print "originMatrix"
+            print originMatrix
+
+            invOriginMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Invert(originMatrix, invOriginMatrix)
+   
+            matrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Multiply4x4(refMatrix, invOriginMatrix, matrix)
+   
+            ## Calculate the error between the actual and the theoretical transforms
+            invTheoMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Invert(theoMatrix, invTheoMatrix)
+   
+            errorMatrix = vtk.vtkMatrix4x4()
+            vtk.vtkMatrix4x4.Multiply4x4(matrix, invTheoMatrix, errorMatrix)
+
+            print "errorMatrix"
+            print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
+            print '(block, block_rot, fid_rot) = (%f, %f, %f)' % (block, block_rot, fid_rot)
+            print errorMatrix
+            csvwriter.writerow( (str(int(scan)), x, y, z, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime, errorMatrix.GetElement(0,0), errorMatrix.GetElement(0,1), errorMatrix.GetElement(0,2), errorMatrix.GetElement(0,3), errorMatrix.GetElement(1,0), errorMatrix.GetElement(1,1), errorMatrix.GetElement(1,2), errorMatrix.GetElement(1,3), errorMatrix.GetElement(2,0), errorMatrix.GetElement(2,1), errorMatrix.GetElement(2,2), errorMatrix.GetElement(2,3), errorMatrix.GetElement(3,0), errorMatrix.GetElement(3,1), errorMatrix.GetElement(3,2), errorMatrix.GetElement(3,3)) )
+
+
 def processExperimentData(imageInfoCSV, outputFile):
 
    # Open spreadsheets
@@ -210,7 +315,8 @@ def processExperimentData(imageInfoCSV, outputFile):
                if str(int(scan)) in node_dict:
                                                   
                   # Calculate gold standard (could be done only for each line)
-                  calculateGoldStandard(scan,x,y,z,block,block_rot,fid_rot, transform)
+                  transform.Identity()
+                  calculateTheoreticalTransform(x,y,z,block,block_rot,fid_rot, transform)
                   transform.GetMatrix(baseMat)
 
                   volId = node_dict[str(int(scan))]
