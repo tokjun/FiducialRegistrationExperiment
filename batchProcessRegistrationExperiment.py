@@ -112,7 +112,46 @@ def batchRegistration(imageInfoCSV, outputFile):
 
                   slicer.mrmlScene.RemoveNode(regT)
 
-   
+
+def closeEnough(a, b):
+   return (numpy.finfo(float).eps > numpy.abs(a - b));
+
+def computeEulerAngles(R):
+   # Based on http://stackoverflow.com/questions/18433801/converting-a-3x3-matrix-to-euler-tait-bryan-angles-pitch-yaw-roll
+
+   #check for gimbal lock
+   if closeEnough(R.GetElement(0, 2), -1.0):
+
+      x = 0.0 #gimbal lock, value of x doesn't matter
+      y = numpy.pi / 2.0
+      z = x + numpy.arctan2(R.GetElement(1, 0), R.GetElement(2, 0))
+
+      return (x, y, z)
+
+   elif closeEnough(R.GetElement(0, 2), 1.0):
+
+      x = 0.0
+      y = -numpy.pi / 2.0;
+      z = -x + numpy.arctan2(-R.GetElement(1, 0), -R.GetElement(2, 0))
+
+      return (x, y, z)
+
+   else: # two solutions exist
+
+      x1 = -numpy.arcsin(R.GetElement(0, 2))
+      x2 = numpy.pi - x1
+      y1 = numpy.arctan2(R.GetElement(1, 2) / numpy.cos(x1), R.GetElement(2, 2) / numpy.cos(x1))
+      y2 = numpy.arctan2(R.GetElement(1, 2) / numpy.cos(x2), R.GetElement(2, 2) / numpy.cos(x2))
+      z1 = numpy.arctan2(R.GetElement(0, 1) / numpy.cos(x1), R.GetElement(0, 0) / numpy.cos(x1))
+      z2 = numpy.arctan2(R.GetElement(0, 1) / numpy.cos(x2), R.GetElement(0, 0) / numpy.cos(x2))
+
+      # choose one solution to return
+      # for example the "shortest" rotation
+      if (numpy.abs(x1) + numpy.abs(y1) + numpy.abs(z1)) <= (numpy.abs(x2) + numpy.abs(y2) + numpy.abs(z2)):
+         return (x1, y1, z1)
+      else:
+         return (x2, y2, z2)
+
 
 def batchComputeError(registrationResultCSV, errorCSV):
    
@@ -184,6 +223,8 @@ def batchComputeError(registrationResultCSV, errorCSV):
          # Comment out if the ost recent origin scan needs to be selected.
          fConsecutiveOrigin=1
    
+         csvwriter.writerow(('Scan', 'R', 'A', 'S', 'BlockTilt', 'BlockRot', 'FiducialRot', 'FiducialDetected', 'OutliersDetected', 'RegistrationError', 'WallTime', 'ProcTime', 'dR', 'dA', 'dS', 'ThetaR', 'ThetaA', 'ThetaS'))
+
          # Main loop
          recentOriginArrayIndex = 0
          for n in range(0, nScans):
@@ -212,7 +253,7 @@ def batchComputeError(registrationResultCSV, errorCSV):
 
             [scan_o, x_o, y_o, z_o, block_o, block_rot_o, fid_rot_o] = paramArray[recentOriginIndex]
             recentOriginScan = scan_o
-            print 'currentScan/recentOriginScan  = %d/%d' % (scan, recentOriginScan)
+            #print 'currentScan/recentOriginScan  = %d/%d' % (scan, recentOriginScan)
             
             ## Obtain theoretical transform from the origin to the current
             theoOriginMatrix = theoMatrixArray[recentOriginIndex]
@@ -242,11 +283,29 @@ def batchComputeError(registrationResultCSV, errorCSV):
             errorMatrix = vtk.vtkMatrix4x4()
             vtk.vtkMatrix4x4.Multiply4x4(refMatrix, invCorrectedTheoRefMatrix, errorMatrix)
 
+            ## Compute Euler Angles (rad)
+            (thetaX, thetaY, thetaZ) = computeEulerAngles(errorMatrix)
+
+            ## Convert to angles
+            thetaR = thetaX * 180.0/numpy.pi
+            thetaA = thetaY * 180.0/numpy.pi
+            thetaS = thetaZ * 180.0/numpy.pi
+
+            ## Extract offsets
+            dR = errorMatrix.GetElement(0, 3)
+            dA = errorMatrix.GetElement(1, 3)
+            dS = errorMatrix.GetElement(2, 3)
+
+            R = -50.0*x
+            A = 10.0*z
+            S = -50.0*y
+            csvwriter.writerow((scan, R, A, S, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime, dR, dA, dS, thetaR, thetaA, thetaS ))
+
             #print "errorMatrix"
             #print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
             #print '(block, block_rot, fid_rot) = (%f, %f, %f)' % (block, block_rot, fid_rot)
             #print errorMatrix
-            csvwriter.writerow( (str(int(scan)), x, y, z, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime, errorMatrix.GetElement(0,0), errorMatrix.GetElement(0,1), errorMatrix.GetElement(0,2), errorMatrix.GetElement(0,3), errorMatrix.GetElement(1,0), errorMatrix.GetElement(1,1), errorMatrix.GetElement(1,2), errorMatrix.GetElement(1,3), errorMatrix.GetElement(2,0), errorMatrix.GetElement(2,1), errorMatrix.GetElement(2,2), errorMatrix.GetElement(2,3), errorMatrix.GetElement(3,0), errorMatrix.GetElement(3,1), errorMatrix.GetElement(3,2), errorMatrix.GetElement(3,3)) )
+            #csvwriter.writerow( (str(int(scan)), x, y, z, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime, errorMatrix.GetElement(0,0), errorMatrix.GetElement(0,1), errorMatrix.GetElement(0,2), errorMatrix.GetElement(0,3), errorMatrix.GetElement(1,0), errorMatrix.GetElement(1,1), errorMatrix.GetElement(1,2), errorMatrix.GetElement(1,3), errorMatrix.GetElement(2,0), errorMatrix.GetElement(2,1), errorMatrix.GetElement(2,2), errorMatrix.GetElement(2,3), errorMatrix.GetElement(3,0), errorMatrix.GetElement(3,1), errorMatrix.GetElement(3,2), errorMatrix.GetElement(3,3)) )
 
 
 
