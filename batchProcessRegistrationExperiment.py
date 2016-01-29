@@ -179,7 +179,10 @@ def batchComputeError(registrationResultCSV, errorCSV):
             
          print 'fConsecutiveOrigin = %d' % fConsecutiveOrigin
 
-         #fConsecutiveOrigin=1
+         # Always assume that the marker was scanned at the origin consectively
+         # (Don't try to find the most recent origin scan.)
+         # Comment out if the ost recent origin scan needs to be selected.
+         fConsecutiveOrigin=1
    
          # Main loop
          recentOriginArrayIndex = 0
