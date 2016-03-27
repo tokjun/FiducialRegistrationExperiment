@@ -1,21 +1,14 @@
 library(ggplot2)
 
-
-plot.with.error.bar <- function(x, y, sd, ymin, ymax) {
-    plot(x, y, ylim=c(ymin, ymax))
-    segments(x, y-sd, x, y+sd)
-    epsilon <- 5
-    segments(x-epsilon, y-sd, x+epsilon,y-sd)
-    segments(x-epsilon, y+sd, x+epsilon,y+sd)
-}
-
-plot.errors <- function(r, ymin, ymax, title) {
-    p <- ggplot(r, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + labs(title=title, x="Translation (mm)", y = "Error (mm)") + theme_classic() + scale_color_manual(values=c('#FFA0A0','#A0FFA0', '#A0A0FF'))
+plot.errors <- function(r, errorType, ymin, ymax, title) {
+    r2 <- r[r$ErrorType==errorType,]
+    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + labs(title=title, x="Translation (mm)", y = "Error (mm)") + theme_classic() + scale_color_manual(values=c('#FFA0A0','#A0FFA0', '#A0A0FF'))
     print(p)
 }
 
-plot.errors.error.bars <- function(r, ymin, ymax, title) {
-    p <- ggplot(r, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r$mean-r$sd, ymax=r$mean+r$sd), width=2,position=position_dodge(0.5)) + labs(title=title, x="Translation (mm)", y = "Error (mm)") + theme_classic() + scale_color_manual(values=c('#FFA0A0','#A0FFA0', '#A0A0FF'))
+plot.errors.error.bars <- function(r, errorType, ymin, ymax, title) {
+    r2 <- r[r$ErrorType==errorType,]
+    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=2,position=position_dodge(0.5)) + labs(title=title, x="Translation (mm)", y = "Error (mm)") + theme_classic() + scale_color_manual(values=c('#FFA0A0','#A0FFA0', '#A0A0FF'))
     print(p)
 }
 
@@ -27,26 +20,41 @@ aggregate.errors.x <- function(x, by) {
 }
 
 aggregate.errors.all <- function(data, by, dirName) {
-    r <- c()
-    r$dR <- aggregate.errors.x(data$dR, data[[by]])
-    r$dR$Direction <- dirName
-    r$dA <- aggregate.errors.x(data$dA, data[[by]])
-    r$dA$Direction <- dirName
-    r$dS <- aggregate.errors.x(data$dS, data[[by]])
-    r$dS$Direction <- dirName
+
+    dR <- aggregate.errors.x(data$dR, data[[by]])
+    dR$Direction <- dirName
+    dR$ErrorType <- "dR"
+    r <- dR
+    dA <- aggregate.errors.x(data$dA, data[[by]])
+    dA$Direction <- dirName
+    dA$ErrorType <- "dA"
+    r <- merge(r, dA, all=TRUE)
+    dS <- aggregate.errors.x(data$dS, data[[by]])
+    dS$Direction <- dirName
+    dS$ErrorType <- "dS"
+    r <- merge(r, dS, all=TRUE)    
     
-    r$ThetaR <- aggregate.errors.x(data$ThetaR, data[[by]])
-    r$ThetaR$Direction <- dirName
-    r$ThetaA <- aggregate.errors.x(data$ThetaA, data[[by]])
-    r$ThetaA$Direction <- dirName
-    r$ThetaS <- aggregate.errors.x(data$ThetaS, data[[by]])
-    r$ThetaS$Direction <- dirName
+    ThetaR <- aggregate.errors.x(data$ThetaR, data[[by]])
+    ThetaR$Direction <- dirName
+    ThetaR$ErrorType <- "ThetaR"
+    r <- merge(r, ThetaR, all=TRUE)    
+    ThetaA <- aggregate.errors.x(data$ThetaA, data[[by]])
+    ThetaA$Direction <- dirName
+    ThetaA$ErrorType <- "ThetaA"
+    r <- merge(r, ThetaA, all=TRUE)    
+    ThetaS <- aggregate.errors.x(data$ThetaS, data[[by]])
+    ThetaS$Direction <- dirName
+    ThetaS$ErrorType <- "ThetaS"
+    r <- merge(r, ThetaS, all=TRUE)    
     
     sqre <- data$dR^2 + data$dA^2 + data$dS^2
-    r$RMS <- aggregate.errors.x(sqre, data[[by]])
-    r$RMS$mean <- sqrt(r$RMS$mean)
-    r$RMS$sd <- sqrt(r$RMS$sd)
-    r$RMS$Direction <- dirName
+    RMS <- aggregate.errors.x(sqre, data[[by]])
+    RMS$mean <- sqrt(RMS$mean)
+    RMS$sd <- sqrt(RMS$sd)
+    RMS$Direction <- dirName
+    RMS$ErrorType <- "RMS"
+    r <- merge(r, RMS, all=TRUE)    
+
     return (r)
 }
 
@@ -81,10 +89,12 @@ tA <- aggregate.errors.all(transA, "A", "A")
 transS <- trans[trans$R==0&trans$A==10,]
 tS <- aggregate.errors.all(transS, "S", "S")
 
-transRMS <- rbind(tR$RMS, tA$RMS, tS$RMS)  # Exclude AP direction
+transErrors <- rbind(tR, tA, tS) 
 pdf("trans-RMS.pdf")
-plot.errors(transRMS, tmin, tmax, 'Root Mean Square Errors')
+plot.errors(transErrors, "RMS", tmin, tmax, 'Root Mean Square Errors')
 dev.off()
+
+
 
 ##BlockRot=0 : facing door of MR room
 rot <- errorData[errorData$R==0&errorData$A==10&errorData$S==0,]
@@ -95,8 +105,8 @@ rS <- aggregate.errors.all(rotS, "BlockTilt", "RotS")
 rotA <- rot[errorData$BlockRot==0,]
 rA <- aggregate.errors.all(rotA, "FiducialRot", "RotA")
 
-rotRMS <- rbind(rR$RMS, rS$RMS, rA$RMS)  # Exclude AP direction
+rotErrors <- rbind(rR, rA, rS) 
 pdf("rot-RMS.pdf")
-plot.errors(rotRMS, tmin, tmax, 'Root Mean Square Errors')
+plot.errors(rotErrors, "RMS", tmin, tmax, 'Root Mean Square Errors')
 dev.off()
 
