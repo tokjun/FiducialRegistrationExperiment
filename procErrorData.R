@@ -16,15 +16,18 @@ plot.errors.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel
 
 # Plot error (with error bar) for each (translational or rotational) direction
 plot.errors.bars.direction <- function(r, errorType, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+    xmargin <- (xmax-xmin)*0.05
     r2 <- r[r$ErrorType==errorType,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=10, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
     print(p)
 }
 
 # Plot error (with error bar) for each (translational or rotational) direction
 plot.errors.bars.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+    xmargin <- (xmax-xmin)*0.05
+    ebwidth <- (xmax-xmin)*0.05
     r2 <- r[r$Direction==direction,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=10, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
     print(p)
 }
 
@@ -75,7 +78,24 @@ aggregate.errors.all <- function(data, by, dirName) {
 }
 
 
-setwd('/home/develop/Projects/Canon/FiducialTest')
+aggregate.errors.trefre <- function(data, by, dirName) {
+
+    FRE <- aggregate.errors.x(data$FRE, data[[by]])
+    FRE$Direction <- dirName
+    FRE$ErrorType <- "FRE"
+    r <- FRE
+    TRE <- aggregate.errors.x(data$TRE, data[[by]])
+    TRE$Direction <- dirName
+    TRE$ErrorType <- "TRE"
+    r <- merge(r, TRE, all=TRUE)
+
+    return (r)
+}
+
+
+#setwd('/home/develop/Dropbox/Experiments/Canon/FiducialTest')
+setwd('/Users/junichi/Dropbox/Experiments/Canon/FiducialTest')
+
 errorData1119 <- read.csv('Error-2015-11-19.csv')
 errorData1119$date <- 1119
 
@@ -167,3 +187,51 @@ pdf("Rotation-S.pdf")
 plot.errors.bars.type(rotErrorsNoRMS, "RotS", 0, 90, ymin, ymax, "Translational/Rotational Errors with Rotation About S-Axis", "S-Rotation (Deg.)", "Errors (mm for Translation / Deg. for Rotation)", 30.0, 1.0)
 dev.off()
 
+
+
+xmin <- 0
+xmax <- 270
+ymin <- -1
+ymax <- 10
+
+## TRE / FRE
+trefreTR <- aggregate.errors.trefre(transR, "R", "R")
+trefreTA <- aggregate.errors.trefre(transA, "A", "A")
+trefreTA$x <- trefreTA$x-10.0 # calibrate to zero
+trefreTS <- aggregate.errors.trefre(transS, "S", "S")
+transTREFRE <- rbind(trefreTR, trefreTA, trefreTS)
+
+## Plot for R translation
+pdf("TREFRE-R.pdf")
+plot.errors.bars.type(transTREFRE, "R", 0, 100, ymin, ymax, "FRE/TRE with R-Translation", "R-Translation (mm)", "FRE/TRE (mm)")
+dev.off()
+
+## Plot for A translation
+pdf("TREFRE-A.pdf")
+plot.errors.bars.type(transTREFRE, "A", 0, 40, ymin, ymax, "FRE/TRE with A-Translation", "A-Translation (mm)", "FRE/TRE (mm)")
+dev.off()
+
+## Plot for S translation
+pdf("TREFRE-S.pdf")
+plot.errors.bars.type(transTREFRE, "S", 0, 150, ymin, ymax, "FRE/TRE with S-Translation", "S-Translation (mm)", "FRE/TRE (mm)")
+dev.off()
+
+trefreRR <- aggregate.errors.trefre(rotR, "BlockTilt", "RotR")
+trefreRS <- aggregate.errors.trefre(rotS, "BlockTilt", "RotS")
+trefreRA <- aggregate.errors.trefre(rotA, "FiducialRot", "RotA")
+rotTREFRE <- rbind(trefreRR, trefreRA, trefreRS)
+
+## Plot for R rotation
+pdf("TREFRE-RotR.pdf")
+plot.errors.bars.type(rotTREFRE, "RotR", 0, 90, ymin, ymax, "FRE/TRE with Rotation About R-Axis", "R-Rotation (Deg.)", "FRE/TRE (mm)", 30.0, 1.0)
+dev.off()
+
+## Plot for A rotation
+pdf("TREFRE-RotA.pdf")
+plot.errors.bars.type(rotTREFRE, "RotA", -0, 270, ymin, ymax, "FRE/TRE with Rotation About A-Axis", "A-Rotation (Deg.)", "FRE/TRE (mm)", 30.0, 1.0)
+dev.off()
+
+## Plot for S rotation
+pdf("TREFRE-RotS.pdf")
+plot.errors.bars.type(rotTREFRE, "RotS", 0, 90, ymin, ymax, "FRE/TRE with Rotation About S-Axis", "S-Rotation (Deg.)", "FRE/TRE (mm)", 30.0, 1.0)
+dev.off()

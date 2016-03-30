@@ -153,7 +153,60 @@ def computeEulerAngles(R):
          return (x2, y2, z2)
 
 
+def computeFRE(referenceMatrix, resultMatrix, fiducialNode):
+   
+   fre = 0.0
+
+   ## FRE
+   nFid = fiducialNode.GetNumberOfFiducials()
+   for i in range(0, nFid):
+      
+      ## Get original fiducial point in the model
+      mfid = [0.0, 0.0, 0.0]
+      fiducialNode.GetNthFiducialPosition(i, mfid)
+      mfid.append(1.0)
+
+      ## Transform fiducials using the registration result
+      tfid = [0.0, 0.0, 0.0, 1.0]
+      resultMatrix.MultiplyPoint(mfid, tfid)
+      a_tfid = numpy.array(tfid[0:3])
+
+      ## Transform fiducials using the reference 
+      rfid = [0.0, 0.0, 0.0, 1.0]
+      referenceMatrix.MultiplyPoint(mfid, rfid)
+      a_rfid = numpy.array(rfid[0:3])
+      
+      ## Calculate FRE
+      d_st = a_rfid-a_tfid
+      fre = fre + numpy.dot(d_st, d_st)
+      
+   fre = numpy.sqrt(fre / nFid)
+
+   return fre
+
+      
+def computeEstimatedTRE(referenceMatrix, resultMatrix, needleLength):
+
+    tipOffset = [0.0, -needleLength, 0.0, 1.0]
+    referenceTipPos = [0.0, 0.0, 0.0, 1.0]
+    registeredTipPos= [0.0, 0.0, 0.0, 1.0]
+
+    referenceMatrix.MultiplyPoint(tipOffset, referenceTipPos)
+    resultMatrix.MultiplyPoint(tipOffset, registeredTipPos)
+
+    npReferenceTipPos = numpy.array(referenceTipPos[0:3])
+    npRegisteredTipPos = numpy.array(registeredTipPos[0:3])
+
+    errorVector = npReferenceTipPos - npRegisteredTipPos
+
+    tre = numpy.linalg.norm(errorVector)
+    
+    return tre
+
+
 def batchComputeError(registrationResultCSV, errorCSV):
+
+   fiducialNode = slicer.mrmlScene.GetNodesByName("RegistrationExperimentFiducialPattern").GetItemAsObject(0)
    
    with open(registrationResultCSV,'rb') as inputFile:
       with open(errorCSV,'wb') as outputFile:
@@ -223,7 +276,7 @@ def batchComputeError(registrationResultCSV, errorCSV):
          # Comment out if the ost recent origin scan needs to be selected.
          fConsecutiveOrigin=1
    
-         csvwriter.writerow(('Scan', 'R', 'A', 'S', 'BlockTilt', 'BlockRot', 'FiducialRot', 'FiducialDetected', 'OutliersDetected', 'RegistrationError', 'WallTime', 'ProcTime', 'dR', 'dA', 'dS', 'ThetaR', 'ThetaA', 'ThetaS'))
+         csvwriter.writerow(('Scan', 'R', 'A', 'S', 'BlockTilt', 'BlockRot', 'FiducialRot', 'FiducialDetected', 'OutliersDetected', 'RegistrationError', 'WallTime', 'ProcTime', 'dR', 'dA', 'dS', 'ThetaR', 'ThetaA', 'ThetaS', 'FRE', 'TRE'))
 
          # Main loop
          recentOriginArrayIndex = 0
@@ -296,10 +349,17 @@ def batchComputeError(registrationResultCSV, errorCSV):
             dA = errorMatrix.GetElement(1, 3)
             dS = errorMatrix.GetElement(2, 3)
 
+            ## Compute TRE at needleLength
+            needleLength = 150
+            fre = computeFRE(correctedTheoRefMatrix, refMatrix, fiducialNode)
+            tre = computeEstimatedTRE(correctedTheoRefMatrix, refMatrix, needleLength)
+
+            print 'FRE = %f, TRE = %f\n' % (fre, tre)
             R = -50.0*x
             A = 10.0*z
             S = -50.0*y
-            csvwriter.writerow((scan, R, A, S, block, block_rot, fid_rot, fiducialDetected, outliersDetected, registrationError, wallTime, procTime, dR, dA, dS, thetaR, thetaA, thetaS ))
+            csvwriter.writerow((scan, R, A, S, block, block_rot, fid_rot,
+                                fiducialDetected, outliersDetected, registrationError, wallTime, procTime, dR, dA, dS, thetaR, thetaA, thetaS, tre, fre))
 
             #print "errorMatrix"
             #print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
