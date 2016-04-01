@@ -102,7 +102,7 @@ def batchRegistration(imageInfoCSV, outputFile):
                if scanstr in node_dict:
                                                   
                   volId = node_dict[str(int(scan))]
-                  [fiducialDetected, outliersDetected, registrationError, wallTime, procTime, registrationMatrixName, registrationMatrixId] = runRegistration(str(int(scan)), volId)
+                  [fiducialDetected, outliersDetected, registrationError, procTime, wallTime, registrationMatrixName, registrationMatrixId] = runRegistration(str(int(scan)), volId)
 
                   regT = slicer.mrmlScene.GetNodeByID(registrationMatrixId)
                   regMat = vtk.vtkMatrix4x4()

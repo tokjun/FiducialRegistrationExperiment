@@ -1,33 +1,69 @@
 library(ggplot2)
 
 # Plot error for each (translational or rotational) direction
-plot.errors.direction <- function(r, errorType, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.direction <- function(r, errorType, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     r2 <- r[r$ErrorType==errorType,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction))
+    #p <- p + geom_line() + geom_point()
+    p <- p + geom_line(aes(linetype=Direction, colour=Direction)) + geom_point(aes(shape=Direction, colour=Direction), size=3)
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + theme_classic()
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2))
+    p <- p + scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
     print(p)
 }
 
 # Plot error for each error type
-plot.errors.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     r2 <- r[r$Direction==direction,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType)) + geom_line() + geom_point() + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType))
+    #p <- p + geom_line() + geom_point()
+    p <- p + geom_line(aes(linetype=ErrorType, colour=ErrorType)) + geom_point(aes(shape=ErrorType, colour=ErrorType), size=3)
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + theme_classic()
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-2,xmax+2))
+    p <- p + scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
     print(p)
 }
 
 # Plot error (with error bar) for each (translational or rotational) direction
-plot.errors.bars.direction <- function(r, errorType, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.bars.direction <- function(r, errorType, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     xmargin <- (xmax-xmin)*0.05
     r2 <- r[r$ErrorType==errorType,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=Direction, color=Direction))
+    #p <- p + geom_line() + geom_point()
+    p <- p + geom_line(aes(linetype=Direction, colour=Direction)) + geom_point(aes(shape=Direction, colour=Direction), size=3)
+    #p <- p + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5))
+    p <- p + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd, colour=Direction, linetype=Direction), width=ebwidth, position=position_dodge(0.1))
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + theme_classic()
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin))
+    p <- p + scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
     print(p)
 }
 
 # Plot error (with error bar) for each (translational or rotational) direction
-plot.errors.bars.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0) {
+plot.errors.bars.type <- function(r, direction, xmin, xmax, ymin, ymax, title, xlabel, ylabel, xtick=10.0, ytick=1.0, xlegendpos=0.2, ylegendpos=0.8) {
     xmargin <- (xmax-xmin)*0.05
     ebwidth <- (xmax-xmin)*0.05
     r2 <- r[r$Direction==direction,]
-    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType)) + geom_line() + geom_point() + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5)) + labs(title=title, x=xlabel, y=ylabel) + theme_classic() + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F')) + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin)) +  scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- ggplot(r2, aes(x=x, y=mean, group=ErrorType, color=ErrorType))
+    #p <- p + geom_line() + geom_point()
+    p <- p + geom_line(aes(linetype=ErrorType, colour=ErrorType)) + geom_point(aes(shape=ErrorType, colour=ErrorType), size=3)
+    #p <- p + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd), width=ebwidth, position=position_dodge(0.5))
+    p <- p + geom_errorbar(aes(ymin=r2$mean-r2$sd, ymax=r2$mean+r2$sd, colour=ErrorType, linetype=ErrorType), width=ebwidth, position=position_dodge(0.1))
+    p <- p + labs(title=title, x=xlabel, y=ylabel)
+    p <- p + theme_classic()
+    p <- p + scale_color_manual(values=c('#0072BE','#DA5319', '#EEB220', '#7E2F8E','#77AD30', '#4DBFEF', '#A3142F'))
+    p <- p + scale_x_continuous(breaks=seq(xmin,xmax,xtick), limits=c(xmin-xmargin,xmax+xmargin))
+    p <- p + scale_y_continuous(breaks=seq(ymin,ymax,ytick), limits=c(ymin,ymax))
+    p <- p + theme_bw() + theme(text = element_text(size=16), legend.key.size=unit(30, "pt"), legend.position=c(xlegendpos, ylegendpos))
     print(p)
 }
 
@@ -188,11 +224,10 @@ plot.errors.bars.type(rotErrorsNoRMS, "RotS", 0, 90, ymin, ymax, "Translational/
 dev.off()
 
 
-
 xmin <- 0
 xmax <- 270
 ymin <- -1
-ymax <- 10
+ymax <- 11
 
 ## TRE / FRE
 trefreTR <- aggregate.errors.trefre(transR, "R", "R")
@@ -235,3 +270,12 @@ dev.off()
 pdf("TREFRE-RotS.pdf")
 plot.errors.bars.type(rotTREFRE, "RotS", 0, 90, ymin, ymax, "FRE/TRE with Rotation About S-Axis", "S-Rotation (Deg.)", "FRE/TRE (mm)", 30.0, 1.0)
 dev.off()
+
+
+### Statistics
+print(sprintf("Number of images: %d",  nrow(errorData)))
+print(sprintf("Average process time: %f +/- %f", mean(errorData$ProcTime), sd(errorData$ProcTime)))
+print(sprintf("Average wall time: %f +/- %f", mean(errorData$WallTime), sd(errorData$WallTime)))
+print(sprintf("Fiducial detection rate: %f %%", sum(errorData$FiducialDetected)/(nrow(errorData)*8) * 100))
+print(sprintf("Overall FRE: %f +/- %f", mean(errorData$FRE), sd(errorData$FRE)))
+print(sprintf("Overall TRE (@ 150 mm): %f +/- %f", mean(errorData$TRE), sd(errorData$TRE)))
