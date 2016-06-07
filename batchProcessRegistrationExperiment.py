@@ -359,7 +359,7 @@ def batchComputeError(registrationResultCSV, errorCSV):
             A = 10.0*z
             S = -50.0*y
             csvwriter.writerow((scan, R, A, S, block, block_rot, fid_rot,
-                                fiducialDetected, outliersDetected, registrationError, wallTime, procTime, dR, dA, dS, thetaR, thetaA, thetaS, tre, fre))
+                                fiducialDetected, outliersDetected, registrationError, wallTime, procTime, dR, dA, dS, thetaR, thetaA, thetaS, fre, tre))
 
             #print "errorMatrix"
             #print '(x, y, z) = (%f, %f, %f)' % (x, y, z)
